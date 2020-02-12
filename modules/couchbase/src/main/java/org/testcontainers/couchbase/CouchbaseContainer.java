@@ -27,6 +27,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.dockerjava.api.command.ExecCreateCmdResponse;
 import com.github.dockerjava.api.command.InspectContainerResponse;
 import com.google.common.collect.Lists;
+import java.time.Duration;
 import lombok.*;
 import org.apache.commons.compress.utils.Sets;
 import org.apache.commons.io.IOUtils;
@@ -100,6 +101,8 @@ public class CouchbaseContainer extends GenericContainer<CouchbaseContainer> {
     private List<BucketAndUserSettings> newBuckets = new ArrayList<>();
 
     private String urlBase;
+
+    private Duration queryServiceTimeout = Duration.ofSeconds(120);
 
     private SocatContainer proxy;
 
@@ -225,6 +228,11 @@ public class CouchbaseContainer extends GenericContainer<CouchbaseContainer> {
         return self();
     }
 
+    public CouchbaseContainer withQueryServiceStartupTimeout(Duration timeout) {
+        this.queryServiceTimeout = timeout;
+        return self();
+    }
+
     @SneakyThrows
     public void initCluster() {
         urlBase = String.format("http://%s:%s", getContainerIpAddress(), getMappedPort(REST));
@@ -290,7 +298,7 @@ public class CouchbaseContainer extends GenericContainer<CouchbaseContainer> {
         }
         if (index) {
             Bucket bucket = getCouchbaseCluster().openBucket(bucketSettings.name(), bucketSettings.password());
-            new CouchbaseQueryServiceWaitStrategy(bucket).waitUntilReady(this);
+            new CouchbaseQueryServiceWaitStrategy(bucket, queryServiceTimeout).waitUntilReady(this);
             if (primaryIndex) {
                 bucket.query(Index.createPrimaryIndex().on(bucketSetting.name()));
             }
